@@ -1,6 +1,6 @@
 # Unmapper
 
-Unmap sections mapped in memory in the memory dump of a PE.
+Unmap sections mapped in memory in the memory dump of a PE using [pefile](https://github.com/erocarrera/pefile).
 
 ## Rationale
 
