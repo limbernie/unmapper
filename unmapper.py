@@ -40,14 +40,25 @@ class Unmapper:
 
         unmapped = False
 
+        unmapped_exports = False
         try:
-            imports = target_pe.DIRECTORY_ENTRY_IMPORT
             exports = target_pe.DIRECTORY_ENTRY_EXPORT
-
-            if imports is not None or exports is not None:
-                unmapped = True
+            if exports is not None:
+                unmapped_exports = True
         except AttributeError:
             pass
+
+        unmapped_imports = False
+        try:
+            imports = target_pe.DIRECTORY_ENTRY_IMPORT
+            if imports is not None:
+                unmapped_imports = True
+        except AttributeError:
+            pass
+
+        if unmapped_exports or unmapped_imports:
+            unmapped = True
+
         return unmapped
 
     def unmap(self):
@@ -86,17 +97,20 @@ class Unmapper:
 
         unmapped_pe = PE(data=buffer)
 
+        path = abspath(self.dump).removesuffix(basename(self.dump))
+        fname, fext = splitext(basename(self.dump))
+        fext = ".bin" if fext == "" else fext
+        filename = f"{fname}_unmapped{fext}"
+
         if self.is_unmapped(unmapped_pe):
-            path = abspath(self.dump).removesuffix(basename(self.dump))
-            fname, fext = splitext(basename(self.dump))
-            fext = ".bin" if fext == "" else fext
-            filename = f"{fname}_unmapped{fext}"
             unmapped_pe.write(filename=f"{path}{filename}")
 
-            if self.debug:
-                print(
-                    f'[*] Successfully unmapped "{basename(self.dump)}" to "{filename}".'
-                )
+        else:
+            with open(f"{path}{filename}", "wb") as file:
+                file.write(buffer)
+
+        if self.debug:
+            print(f'[*] Successfully unmapped "{basename(self.dump)}" to "{filename}".')
 
     def backup_and_unmap(self, backup=False):
         """Backup and unmap memory dump."""
