@@ -8,7 +8,7 @@ from os.path import abspath, basename, splitext
 from shutil import copy2
 import sys
 
-from pefile import PE
+from pefile import PE, PEFormatError
 
 __author__ = "limbernie"
 __program__ = "Unmapper"
@@ -20,7 +20,11 @@ class Unmapper:
 
     def __init__(self, path_to_dump, debug=False):
         self.dump = path_to_dump
-        self.target_pe = PE(self.dump)
+        try:
+            self.target_pe = PE(self.dump)
+        except PEFormatError:
+            print("[!] File is not in the PE format.")
+            sys.exit(1)
         self.debug = debug
 
     def backup(self):
@@ -105,12 +109,13 @@ class Unmapper:
         if self.is_unmapped(unmapped_pe):
             unmapped_pe.write(filename=f"{path}{filename}")
 
+            if self.debug:
+                print(
+                    f'[*] Successfully unmapped "{basename(self.dump)}" to "{filename}".'
+                )
         else:
-            with open(f"{path}{filename}", "wb") as file:
-                file.write(buffer)
-
-        if self.debug:
-            print(f'[*] Successfully unmapped "{basename(self.dump)}" to "{filename}".')
+            print("[!] Unmapping failed.")
+            sys.exit(1)
 
     def backup_and_unmap(self, backup=False):
         """Backup and unmap memory dump."""
@@ -148,7 +153,7 @@ def main():
         unmapper = Unmapper(dump, debug=args.debug)
         if unmapper.is_unmapped():
             print(f'[!] File "{basename(dump)}" appears to be already unmapped.')
-            sys.exit(1)
+            sys.exit()
         else:
             unmapper.backup_and_unmap(args.backup)
     else:
