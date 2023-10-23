@@ -5,17 +5,26 @@ Unmap sections mapped in memory in the memory dump of a PE.
 from argparse import ArgumentParser
 from collections import Counter
 from math import ceil
-from pathlib import Path
 from os.path import abspath, basename, exists, join, splitext
+from pathlib import Path
 from shutil import copy2
 from struct import unpack
+import platform
 import sys
-
-from pefile import PE, PEFormatError, IMAGE_CHARACTERISTICS
 
 __author__ = "limbernie"
 __program__ = "Unmapper"
 __version__ = "1.0"
+
+if "Windows" not in platform.system():
+    print(f"[!] {__program__} can only be run in Windows.")
+    sys.exit(1)
+else:
+    try:
+        from pefile import PE, PEFormatError, IMAGE_CHARACTERISTICS
+    except ImportError:
+        print("[!] Module pefile not found.")
+        sys.exit(1)
 
 
 class Unmapper:
