@@ -51,57 +51,47 @@ class Unmapper:
     def __find_base(self, target_pe: PE = None) -> int:
         """Find base address of image from relocs."""
 
-        def within(value: int, compare: int) -> bool:
-            return round(value / compare, 1) == 1.0
-
         if target_pe is None:
             target_pe = self.target_pe
 
         if not target_pe.has_relocs():
-            return 0
+            return target_pe.OPTIONAL_HEADER.ImageBase
 
         relocs = target_pe.DIRECTORY_ENTRY_BASERELOC
         mapped = target_pe.get_memory_mapped_image()
-        candidates = []
-        default = 0x00400000
+        entries = []
+
+        mask = ~0xFFFF
 
         if self.__is_32bit():
-            if self.__is_dll():
-                mask = 0xFFF00000
-                default = 0x10000000
-            else:
-                mask = 0xFFFF0000
+            mask &= 0xFFFF0000
             size = 0x4
             fmtstr = "<I"
         else:
-            mask = 0xFFFF000000
+            mask &= 0xFFFFFF0000
             size = 0x8
             fmtstr = "<Q"
-            if self.__is_dll():
-                default = 0x10000000
 
         for reloc in relocs:
             for entry in reloc.entries:
-                candidates.append(
+                entries.append(
                     unpack(fmtstr, mapped[entry.rva : entry.rva + size])[0] & mask
                 )
 
-        # First count
-        count = Counter(candidates)
+        # Count relocation entries with mask on
+        count = Counter(entries)
 
-        # Gathering candidates within vicinity of highest count
-        pivot = count.most_common(1)[0][0]
-        count = Counter({k: c for k, c in count.items() if within(k, pivot)})
+        # Entries with count more than pivot
+        pivot = 15
+        if count.most_common(1)[-1][1] > pivot:
+            count = Counter({k: c for k, c in count.items() if c > pivot})
+            guess = min(k for (k, c) in count.most_common() if k != 0)
+        else:
+            guess = count.most_common(1)[-1][0]
 
-        # Get rid of candidates with a count of 1
-        count = Counter({k: c for k, c in count.items() if c > 1})
+        pivot = 0x10000
 
-        # Counting from behind
-        count = Counter({k: count.total() - c for k, c in count.items()})
-
-        guess = count.most_common(1)[-1][0]
-
-        return default if within(guess, default) else guess
+        return (guess - pivot) if (guess & 0xF0000) == pivot else guess
 
     def __is_32bit(self, target_pe: PE = None) -> bool:
         """Check if target PE is 32-bit."""
@@ -116,20 +106,6 @@ class Unmapper:
             is_32bit = True
 
         return is_32bit
-
-    def __is_dll(self, target_pe: PE = None) -> bool:
-        """Check if target PE is a DLL."""
-
-        if target_pe is None:
-            target_pe = self.target_pe
-
-        is_dll = False
-        flag = IMAGE_CHARACTERISTICS["IMAGE_FILE_DLL"]
-
-        if target_pe.FILE_HEADER.Characteristics & flag == flag:
-            is_dll = True
-
-        return is_dll
 
     def __virtual_to_raw__(self) -> None:
         """Implementation of hasherezade's PE_VIRTUAL_TO_RAW mode in libpeconv."""
@@ -163,15 +139,7 @@ class Unmapper:
             rebase = self.__find_base()
             print("[!] No base address is provided. Guessing from relocs...")
             print(f"[*] Found image base: 0x{rebase:X}")
-            if rebase == 0:
-                if self.__is_dll():
-                    rebase = 0x10000000
-                else:
-                    rebase = 0x400000
-            else:
-                self.target_pe.OPTIONAL_HEADER.ImageBase = rebase
-        else:
-            self.target_pe.OPTIONAL_HEADER.ImageBase = self.base
+            self.target_pe.OPTIONAL_HEADER.ImageBase = rebase
 
     def __write_to_file__(self, unmapped_pe_file: str) -> None:
         """Write modifed PE to file."""
