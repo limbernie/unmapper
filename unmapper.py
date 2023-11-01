@@ -139,7 +139,9 @@ class Unmapper:
             rebase = self.__find_base()
             print("[!] No base address is provided. Guessing from relocs...")
             print(f"[*] Found image base: 0x{rebase:X}")
-            self.target_pe.OPTIONAL_HEADER.ImageBase = rebase
+            self.base = rebase
+
+        self.target_pe.OPTIONAL_HEADER.ImageBase = self.base
 
     def __write_to_file__(self, unmapped_pe_file: str) -> None:
         """Write modifed PE to file."""
