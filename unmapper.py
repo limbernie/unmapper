@@ -43,7 +43,7 @@ class Unmapper:
         self.out = params["unmapped_pe_file"]
 
     def __load_pe(self, path_to_dump: str) -> PE:
-        """Load PE from path to dump."""
+        """Load PE in path to dump."""
         pe = PE(path_to_dump)
 
         return pe
